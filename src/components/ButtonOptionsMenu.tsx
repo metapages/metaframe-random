@@ -130,8 +130,8 @@ const OptionsMenu: FunctionalComponent<{
       }
       if (option.type === "boolean") {
         setLocalOptions({ ...localOptions, [name]: value === "1" });
-      } else if (option.type === "number") {
-        setLocalOptions({ ...localOptions, [name]: value !== undefined && value !== "" ? parseFloat(value) : undefined });
+      // } else if (option.type === "number") {
+      //   setLocalOptions({ ...localOptions, [name]: value !== undefined && value !== "" ? parseFloat(value) : undefined });
       } else {
         setLocalOptions({ ...localOptions, [name]: value });
       }
@@ -146,6 +146,7 @@ const OptionsMenu: FunctionalComponent<{
   const onCloseAndAccept = useCallback(() => {
     // first validate if available
     const maybeErrors: Record<string, string> = {};
+
     Object.keys(localOptions).forEach((key) => {
       const option: Option | undefined = options.find((o) => o.name === key);
       if (option && option.validator && option.type !== "boolean") {
@@ -183,7 +184,7 @@ const OptionsMenu: FunctionalComponent<{
               localOptions[key] === "true";
           } else if (option.type === "number") {
             convertedOptions[key] = typeof(localOptions[key]) === "string" ? parseFloat(localOptions[key] as string) : localOptions[key];
-          }{
+          } else {
             convertedOptions[key] = localOptions[key];
           }
         }
