@@ -13,7 +13,6 @@ export const Home: FunctionalComponent = () => (
   <Flex flexDirection="column">
     <Random/>
   </Flex>
-
   <Spacer />
   <ButtonHelp />
   <ButtonOptionsMenu options={options} />

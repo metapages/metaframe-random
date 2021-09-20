@@ -6,7 +6,7 @@ import { ButtonHelp } from "./ButtonHelp";
 import { Option } from "/@/components/ButtonOptionsMenu";
 import { useHashParamJson, useMetaframe } from "@metapages/metaframe-hook";
 
-type Distributions = "uniform" | "uniformInt" | "normal";
+type Distributions = "uniform" | "uniformInt" | "normal" | "sin";
 
 export const options: Option[] = [
   {
@@ -17,10 +17,10 @@ export const options: Option[] = [
   },
   {
     name: "distribution",
-    displayName: "Random distribution",
+    displayName: "Distribution",
     default: "uniform",
     type: "option",
-    options: ["uniform", "uniformInt", "normal"],
+    options: ["uniform", "uniformInt", "normal", "sin"],
     suboptions: {
       uniform: [
         {
@@ -65,6 +65,14 @@ export const options: Option[] = [
           type: "number",
         },
       ],
+      sin: [
+        {
+          name: "increment",
+          displayName: "increment",
+          default: 0.01,
+          type: "number",
+        },
+      ],
     },
   },
 ];
@@ -102,6 +110,10 @@ export const Random: FunctionalComponent = () => {
       optionsInHashParams["sigma"] !== undefined
         ? (optionsInHashParams["sigma"] as number)
         : 1;
+    const increment: number =
+      optionsInHashParams["increment"] !== undefined
+        ? (optionsInHashParams["increment"] as number)
+        : 0.01;
 
     const f: number =
       optionsInHashParams["frequency"] !== undefined
@@ -121,6 +133,13 @@ export const Random: FunctionalComponent = () => {
         break;
       case "normal":
         setRand({ f, rand: random.normal(mu, sigma) });
+        break;
+      case "sin":
+        let current :number = 0.01;
+        setRand({ f, rand: () => {
+          current += increment;
+          return Math.sin(current);
+         }});
         break;
     }
   }, [optionsInHashParams]);
