@@ -12,8 +12,7 @@ import { isIframe } from "@metapages/metaframe-hook";
 import { QuestionIcon } from "@chakra-ui/icons";
 
 export const ButtonHelp: FunctionalComponent<{ url?: string }> = ({ url }) => {
-  // const [open, setOpen] = useState<boolean>(isIframe() ? false : true);
-  const [open, setOpen] = useState<boolean>(false);
+  const [open, setOpen] = useState<boolean>(isIframe() || window.location.hash.length >= 3 ? false : true);
 
   url = url
     ? url
@@ -28,9 +27,8 @@ export const ButtonHelp: FunctionalComponent<{ url?: string }> = ({ url }) => {
       <IconButton
         verticalAlign="top"
         aria-label="Help"
-        // @ts-ignore
         icon={<QuestionIcon />}
-        size="lg"
+        size="md"
         onClick={onClick}
         mr="4"
       />
@@ -52,7 +50,7 @@ const HelpPanel: FunctionalComponent<{
     setOpen(false);
   }, [setOpen]);
 
-  const iframeUrl = `https://markdown.mtfm.io/#?url=${url}`;
+  const iframeUrl = `https://metapages.github.io/metaframe-markdown/#?url=${url}`;
 
   return (
     <Drawer

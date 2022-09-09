@@ -1,6 +1,6 @@
 import { FunctionalComponent } from "preact";
 import { useEffect, useState, useCallback } from "preact/hooks";
-import { useHashParamJson } from "@metapages/metaframe-hook";
+import { useHashParamJson } from "@metapages/hash-query";
 import {
   Box,
   Drawer,
@@ -14,6 +14,7 @@ import {
   Input,
   Select,
   HStack,
+  Spacer,
   Switch,
   Text,
 } from "@chakra-ui/react";
@@ -56,9 +57,10 @@ const useOptions = (options: Option[], chosenOptions?: GenericOptions) => {
   return [optionsState];
 };
 
-export const ButtonOptionsMenu: FunctionalComponent<{ options: Option[] }> = ({
-  options,
-}) => {
+export const ButtonOptionsMenu: FunctionalComponent<{
+  options: Option[];
+  hashkey?: string;
+}> = ({ hashkey, options }) => {
   const [open, setOpen] = useState<boolean>(false);
 
   const onClick = useCallback(() => {
@@ -72,10 +74,15 @@ export const ButtonOptionsMenu: FunctionalComponent<{ options: Option[] }> = ({
         aria-label="Metaframe settings"
         // @ts-ignore
         icon={<SettingsIcon />}
-        size="lg"
+        size="md"
         onClick={onClick}
       />
-      <OptionsMenu isOpen={open} setOpen={setOpen} options={options} />
+      <OptionsMenu
+        hashkey={hashkey}
+        isOpen={open}
+        setOpen={setOpen}
+        options={options}
+      />
     </>
   );
 };
@@ -86,12 +93,13 @@ const OptionsMenu: FunctionalComponent<{
   isOpen: boolean;
   setOpen: (open: boolean) => void;
   options: Option[];
-}> = ({ isOpen, setOpen, options }) => {
+  hashkey?: string;
+}> = ({ hashkey, isOpen, setOpen, options }) => {
   // isOpen = true; // for debugging/developing
 
   const [optionsInHashParams, setOptionsInHashParams] =
     useHashParamJson<GenericOptions>(
-      "options",
+      hashkey ? hashkey : "options",
       Object.fromEntries(
         options
           .filter((o) => o.default)
@@ -146,7 +154,6 @@ const OptionsMenu: FunctionalComponent<{
   const onCloseAndAccept = useCallback(() => {
     // first validate if available
     const maybeErrors: Record<string, string> = {};
-
     Object.keys(localOptions).forEach((key) => {
       const option: Option | undefined = options.find((o) => o.name === key);
       if (option && option.validator && option.type !== "boolean") {
@@ -264,10 +271,9 @@ const OptionsMenu: FunctionalComponent<{
                 <GridItem rowSpan={1} colSpan={12}></GridItem>
                 <GridItem rowSpan={1} colSpan={12}></GridItem>
                 <GridItem rowSpan={1} colSpan={12}></GridItem>
-                <GridItem rowSpan={1} colSpan={10}></GridItem>
-
-                <GridItem rowSpan={0} colSpan={2}>
-                  <HStack spacing={2} justify="flex-end" direction="row">
+                <GridItem rowSpan={1} colSpan={12}>
+                  <HStack spacing={2} direction="row">
+                    <Spacer />
                     {/*
                       // @ts-ignore */}
                     <IconButton
@@ -329,7 +335,7 @@ const renderInput = (option: Option, value: any, onChange: any) => {
             name={option.name}
             type="text"
             placeholder=""
-            value={value}
+            value={value === undefined ? option.default : value}
             onInput={onChange}
           />
         </Box>
