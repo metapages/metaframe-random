@@ -1,8 +1,6 @@
 import { FunctionalComponent } from "preact";
 import { useEffect, useState } from "preact/hooks";
-import { Box, Flex, Heading, Spacer, Text } from "@chakra-ui/react";
 import random from "random";
-import { ButtonHelp } from "./ButtonHelp";
 import { Option } from "/@/components/ButtonOptionsMenu";
 import { useHashParamJson, useMetaframe } from "@metapages/metaframe-hook";
 

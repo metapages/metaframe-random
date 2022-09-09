@@ -1,16 +1,12 @@
 {
-	"version": "0.3",
+	"version": "0.6",
 	"metadata": {
-		"title": "metaframe-template"
-	},
-	"inputs": {
-		"*": {
-			"type": "application/octet-stream:base64"
-		}
+		"name": "Number distrubution generator",
+		"tags": ["random", "distribution"]
 	},
     "outputs": {
-		"*": {
-			"type": "application/octet-stream:base64"
+		"v": {
+			"type": "number"
 		}
 	}
 }
