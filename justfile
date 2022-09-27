@@ -8,7 +8,7 @@ set dotenv-load                    := true
 # The root domain for this app, serving index.html
 export APP_FQDN                    := env_var_or_default("APP_FQDN", "metaframe1.localhost")
 export APP_PORT                    := env_var_or_default("APP_PORT", "4430")
-ROOT                               := env_var_or_default("GITHUB_WORKSPACE", `git rev-parse --show-toplevel`)
+ROOT                               := env_var_or_default("GITHUB_WORKSPACE", `(which git >/dev/null && git rev-parse --show-toplevel) || pwd`)
 export CI                          := env_var_or_default("CI", "")
 PACKAGE_NAME_SHORT                 := file_name(`cat package.json | jq -r '.name' | sd '.*/' ''`)
 # Store the CI/dev docker image in github
@@ -19,7 +19,7 @@ export DOCKER_TAG                  := `if [ "${GITHUB_ACTIONS}" = "true" ]; then
 # The NPM_TOKEN is required for publishing to https://www.npmjs.com
 NPM_TOKEN                          := env_var_or_default("NPM_TOKEN", "")
 # Source of deno scripts. When developing we need to switch this
-DENO_SOURCE                        := env_var_or_default("DENO_SOURCE", "https://deno.land/x/metapages@v0.0.13")
+DENO_SOURCE                        := env_var_or_default("DENO_SOURCE", "https://deno.land/x/metapages@v0.0.14")
 # vite needs an extra memory boost
 vite                               := "VITE_APP_FQDN=" + APP_FQDN + " VITE_APP_PORT=" + APP_PORT + " NODE_OPTIONS='--max_old_space_size=16384' ./node_modules/vite/bin/vite.js"
 tsc                                := "./node_modules/typescript/bin/tsc"
@@ -60,24 +60,32 @@ dev: _mkcert _ensure_npm_modules (_tsc "--build")
     export BASE=
     VITE_APP_ORIGIN=${APP_ORIGIN} {{vite}} --clearScreen false ${MAYBE_OPEN_BROWSER}
 
-# Publish to npm and github pages.
-publish npmversionargs="patch": _ensureGitPorcelain (_tsc "--build") (_npm_version npmversionargs) _githubpages_publish
-    @# Push the tags up
+# Increment semver version, push the tags (triggers "on-tag-version")
+@publish npmversionargs="patch": _fix_git_actions_permission _ensureGitPorcelain (_npm_version npmversionargs)
+    # Push the tags up
     git push origin v$(cat package.json | jq -r '.version')
 
-build BASE="": _ensure_npm_modules (_tsc "--build")
+# Publish targets (add to the end of the on-tag-version command to execute):
+#   - `_npm_publish`: publish to npm
+#   - `_githubpages_publish`: publish to github pages
+#   - `_cloudflare_pages_publish`: publish to cloudflare pages
+# Reaction to "publish". On new git version tag: publish code [github pages, cloudflare pages, npm]
+on-tag-version: _fix_git_actions_permission _ensure_npm_modules _ensureGitPorcelain _cloudflare_pages_publish
+
+# build the browser app in ./docs (default for github pages)
+_browser_client_build BASE="":
     HOST={{APP_FQDN}} \
     OUTDIR=./docs \
     BASE={{BASE}} \
         deno run --allow-all --unstable {{DENO_SOURCE}}/browser/vite-build.ts --versioning=true
 
-# Build the browser client static assets and npm module
-# build: (_tsc "--build") _browser_assets_build _npm_build
-
 # Test: currently bare minimum: only building. Need proper test harness.
 @test: (_tsc "--build") build
 
-# Deletes: .certs dist
+# Build the [browser app, npm lib] for production. Called automatically by "test" and "publish"
+build BASE="": _ensure_npm_modules (_tsc "--build") (_browser_client_build BASE)
+
+# Deletes: [ .certs, dist ]
 @clean:
     rm -rf .certs dist
 
@@ -95,11 +103,15 @@ serve: _mkcert build
     mkdir -p dist
     rm -rf dist/*
     {{tsc}} --noEmit false --project ./tsconfig.npm.json
+    OUTDIR=./dist \
+    DEPLOY_TARGET=lib \
+        deno run --allow-all --unstable {{DENO_SOURCE}}/browser/vite-build.ts
     echo "  ✅ npm build"
 
 # bumps version, commits change, git tags
-_npm_version npmversionargs="patch":
+@_npm_version npmversionargs="patch":
     npm version {{npmversionargs}}
+    echo -e "  📦 new version: {{green}}$(cat package.json | jq -r .version){{normal}}"
 
 # If the npm version does not exist, publish the module
 _npm_publish: _require_NPM_TOKEN _npm_build
@@ -151,7 +163,11 @@ _tsc +args="": _ensure_npm_modules
     {{vite}} {{args}}
 
 # update "gh-pages" branch with the (versioned and default) current build (./docs) (and keeping all previous versions)
-_githubpages_publish:
+@_githubpages_publish: _ensure_npm_modules
+    BASE=$(if [ -f "public/CNAME" ]; then echo ""; else echo "{{PACKAGE_NAME_SHORT}}"; fi) \
+        deno run --unstable --allow-all {{DENO_SOURCE}}/browser/gh-pages-publish-to-docs.ts --versioning=true
+
+@_cloudflare_pages_publish: _ensure_npm_modules
     deno run --unstable --allow-all {{DENO_SOURCE}}/browser/gh-pages-publish-to-docs.ts --versioning=true
 
 ####################################################################################
@@ -207,8 +223,25 @@ _ensure_inside_docker:
         exit 1
     fi
 
-@_ensureGitPorcelain:
-    deno run --allow-all --unstable {{DENO_SOURCE}}/git/git-fail-if-uncommitted-files.ts
+_ensureGitPorcelain:
+    #!/usr/bin/env bash
+    set -eo pipefail
+    # In github actions, we modify .github/actions/cloud/action.yml for reasons
+    # so do not do this check there
+    if [ "${GITHUB_WORKSPACE}" = "" ]; then
+        deno run --allow-all --unstable {{DENO_SOURCE}}/git/git-fail-if-uncommitted-files.ts
+    fi
 
 @_require_NPM_TOKEN:
 	if [ -z "{{NPM_TOKEN}}" ]; then echo "Missing NPM_TOKEN env var"; exit 1; fi
+
+_fix_git_actions_permission:
+    #!/usr/bin/env bash
+    set -eo pipefail
+    # workaround for github actions docker permissions issue
+    if [ "${GITHUB_WORKSPACE}" != "" ]; then
+        git config --global --add safe.directory /github/workspace
+        git config --global --add safe.directory /repo
+        git config --global --add safe.directory $(pwd)
+        export GIT_CEILING_DIRECTORIES=/__w
+    fi

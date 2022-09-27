@@ -1,146 +1,90 @@
-import { FunctionalComponent } from "preact";
-import { useEffect, useState } from "preact/hooks";
+import { useEffect, useMemo, useState } from "react";
 import random from "random";
-import { Option } from "/@/components/ButtonOptionsMenu";
-import { useHashParamJson, useMetaframe } from "@metapages/metaframe-hook";
+import { useMetaframe } from "@metapages/metaframe-hook";
+import { useHashParamJson } from "@metapages/hash-query";
+import {
+  defaultOptions,
+  defaultOptionsSin,
+  DistributionOptions,
+  DistributionOptionsNormal,
+  DistributionOptionsSin,
+  DistributionOptionsUniform,
+  DistributionOptionsUniformInt,
+} from "/@/components/OptionsPanel";
+import { CheckIcon } from "@chakra-ui/icons";
 
-type Distributions = "uniform" | "uniformInt" | "normal" | "sin";
-
-export const options: Option[] = [
-  {
-    name: "frequency",
-    displayName: "Frequency (per second)",
-    default: 1,
-    type: "number",
-  },
-  {
-    name: "distribution",
-    displayName: "Distribution",
-    default: "uniform",
-    type: "option",
-    options: ["uniform", "uniformInt", "normal", "sin"],
-    suboptions: {
-      uniform: [
-        {
-          name: "min",
-          displayName: "Min",
-          default: 0,
-          type: "number",
-        },
-        {
-          name: "max",
-          displayName: "Max",
-          default: 1,
-          type: "number",
-        },
-      ],
-      uniformInt: [
-        {
-          name: "min",
-          displayName: "Min",
-          default: 0,
-          type: "number",
-        },
-        {
-          name: "max",
-          displayName: "Max",
-          default: 10,
-          type: "number",
-        },
-      ],
-      uniformBoolean: [],
-      normal: [
-        {
-          name: "mu",
-          displayName: "mu",
-          default: 0,
-          type: "number",
-        },
-        {
-          name: "sigma",
-          displayName: "sigma",
-          default: 1,
-          type: "number",
-        },
-      ],
-      sin: [
-        {
-          name: "increment",
-          displayName: "increment",
-          default: 0.01,
-          type: "number",
-        },
-      ],
-    },
-  },
-];
-
-export const Random: FunctionalComponent = () => {
+export const Random: React.FC = () => {
   const metaframe = useMetaframe();
-  const [optionsInHashParams] =
-    useHashParamJson<{ [name in string]: string | boolean | number }>(
-      "options"
-    );
-  const [rand, setRand] = useState<{ f: number; rand: () => number }>({
-    f: 1,
+
+  const [options] = useHashParamJson<DistributionOptions>(
+    "distribution",
+    defaultOptions
+  );
+
+  const [rand, setRand] = useState<{
+    frequency: number;
+    rand: () => number | boolean;
+  }>({
+    frequency: 1,
     rand: random.uniform(0, 1),
   });
-  const [value, setValue] = useState<number>(0);
+  const [value, setValue] = useState<string>("");
 
   useEffect(() => {
-    if (!optionsInHashParams) {
+    if (!options) {
       return;
     }
-    let dist: Distributions = "uniform";
-    const min: number =
-      optionsInHashParams["min"] !== undefined
-        ? (optionsInHashParams["min"] as number)
-        : 0;
-    const max: number =
-      optionsInHashParams["max"] !== undefined
-        ? (optionsInHashParams["max"] as number)
-        : 1;
-    const mu: number =
-      optionsInHashParams["mu"] !== undefined
-        ? (optionsInHashParams["mu"] as number)
-        : 0;
-    const sigma: number =
-      optionsInHashParams["sigma"] !== undefined
-        ? (optionsInHashParams["sigma"] as number)
-        : 1;
-    const increment: number =
-      optionsInHashParams["increment"] !== undefined
-        ? (optionsInHashParams["increment"] as number)
-        : 0.01;
 
-    const f: number =
-      optionsInHashParams["frequency"] !== undefined
-        ? (optionsInHashParams["frequency"] as number)
-        : 1;
-
-    if (optionsInHashParams["distribution"]) {
-      dist = optionsInHashParams["distribution"] as Distributions;
-    }
+    let dist = options.distribution;
+    let frequency = options.frequency;
 
     switch (dist) {
       case "uniform":
-        setRand({ f, rand: random.uniform(min, max) });
+        const uniformOptions = options.options as DistributionOptionsUniform;
+        setRand({
+          frequency,
+          rand: random.uniform(uniformOptions.min, uniformOptions.max),
+        });
         break;
       case "uniformInt":
-        setRand({ f, rand: random.uniformInt(Math.floor(min), Math.floor(max)) });
+        const uniformIntOptions =
+          options.options as DistributionOptionsUniformInt;
+        setRand({
+          frequency,
+          rand: random.uniformInt(
+            Math.floor(uniformIntOptions.min),
+            Math.floor(uniformIntOptions.max)
+          ),
+        });
+        break;
+      case "uniformBoolean":
+        setRand({ frequency, rand: random.uniformBoolean() });
         break;
       case "normal":
-        setRand({ f, rand: random.normal(mu, sigma) });
+        const uniformNormalOptions =
+          options.options as DistributionOptionsNormal;
+        setRand({
+          frequency,
+          rand: random.normal(
+            uniformNormalOptions.mu,
+            uniformNormalOptions.sigma
+          ),
+        });
         break;
       case "sin":
-        let current :number = 0.01;
-        setRand({ f, rand: () => {
-          current += increment;
-          return Math.sin(current);
-         }});
+        const sinOptions = options.options as DistributionOptionsSin;
+        const increment = sinOptions.increment ?? defaultOptionsSin.increment;
+        let current: number = 0.01;
+        setRand({
+          frequency,
+          rand: () => {
+            current += increment;
+            return Math.sin(current);
+          },
+        });
         break;
     }
-  }, [optionsInHashParams]);
+  }, [options]);
 
   useEffect(() => {
     if (!metaframe) {
@@ -150,13 +94,24 @@ export const Random: FunctionalComponent = () => {
     const handle = setInterval(() => {
       const val = rand.rand();
       metaframe.metaframe?.setOutput("v", val);
-      setValue(val);
-    }, 1000 / rand.f);
+      if (options.showOutput) {
+        setValue(`${val}`);
+      }
+    }, 1000 / rand.frequency);
 
     return () => {
       clearInterval(handle);
     };
-  }, [metaframe, rand]);
+  }, [metaframe, rand, options.showOutput, setValue]);
 
-  return <div>{value}</div>;
+  const staticEmittingText = useMemo(
+    () => (
+      <>
+        Emitting <CheckIcon color="green" />
+      </>
+    ),
+    []
+  );
+
+  return <div>{options.showOutput ? value : staticEmittingText}</div>;
 };
