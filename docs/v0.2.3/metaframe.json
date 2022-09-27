@@ -1,0 +1,18 @@
+{
+	"version": "0.6",
+	"metadata": {
+		"name": "Number distrubution generator",
+		"tags": [
+			"random",
+			"distribution",
+			"normal",
+			"sin",
+			"uniform"
+		]
+	},
+	"outputs": {
+		"v": {
+			"type": "number"
+		}
+	}
+}
